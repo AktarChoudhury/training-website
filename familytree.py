@@ -1,0 +1,127 @@
+import tkinter as tk
+from tkinter import ttk
+import sqlite3
+
+class FamilyTreeApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Family Tree App")
+
+        # Connect to the SQLite database (or create it if not exists)
+        self.conn = sqlite3.connect('family_tree.db')
+        self.cursor = self.conn.cursor()
+
+        # Create a table to store family members
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS family_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                birthdate TEXT,
+                parent_id INTEGER,
+                FOREIGN KEY (parent_id) REFERENCES family_members(id)
+            )
+        ''')
+        self.conn.commit()
+
+        # GUI components
+        self.label_name = ttk.Label(root, text="Name:")
+        self.entry_name = ttk.Entry(root)
+
+        self.label_birthdate = ttk.Label(root, text="Birthdate:")
+        self.entry_birthdate = ttk.Entry(root)
+
+        self.label_parent_id = ttk.Label(root, text="Parent's ID:")
+        self.entry_parent_id = ttk.Entry(root)
+
+        self.btn_add_member = ttk.Button(root, text="Add Family Member", command=self.add_family_member)
+        self.btn_display_tree = ttk.Button(root, text="Display Family Tree", command=self.display_family_tree)
+        self.btn_search_name = ttk.Button(root, text="Search by Name", command=self.search_by_name)
+        self.btn_delete_member = ttk.Button(root, text="Delete Family Member", command=self.delete_family_member)
+
+        # Layout
+        self.label_name.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.entry_name.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+
+        self.label_birthdate.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.entry_birthdate.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+
+        self.label_parent_id.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.entry_parent_id.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+
+        self.btn_add_member.grid(row=3, column=0, columnspan=2, pady=10)
+        self.btn_display_tree.grid(row=4, column=0, columnspan=2, pady=10)
+        self.btn_search_name.grid(row=5, column=0, columnspan=2, pady=10)
+        self.btn_delete_member.grid(row=6, column=0, columnspan=2, pady=10)
+
+    def add_family_member(self):
+        name = self.entry_name.get()
+        birthdate = self.entry_birthdate.get()
+        parent_id = self.entry_parent_id.get()
+
+        # Insert the family member data into the database
+        self.cursor.execute('''
+            INSERT INTO family_members (name, birthdate, parent_id) VALUES (?, ?, ?)
+        ''', (name, birthdate, parent_id if parent_id else None))
+
+        self.conn.commit()
+        print("Family member added successfully!")
+
+    def display_family_tree(self):
+        tree_window = tk.Toplevel(self.root)
+        tree_window.title("Family Tree Display")
+
+        tree_text = tk.Text(tree_window, wrap="word")
+        tree_text.pack(padx=10, pady=10)
+
+        tree_text.insert(tk.END, "Family Tree Display:\n\n")
+
+        self.cursor.execute('SELECT * FROM family_members')
+        family_members = self.cursor.fetchall()
+
+        for member in family_members:
+            tree_text.insert(tk.END, f"ID: {member[0]}, Name: {member[1]}, Birthdate: {member[2]}, Parent ID: {member[3]}\n")
+
+    def search_by_name(self):
+        search_name = self.entry_name.get()
+        self.cursor.execute('SELECT * FROM family_members WHERE name LIKE ?', ('%' + search_name + '%',))
+        results = self.cursor.fetchall()
+
+        search_window = tk.Toplevel(self.root)
+        search_window.title("Search Results")
+
+        search_text = tk.Text(search_window, wrap="word")
+        search_text.pack(padx=10, pady=10)
+
+        search_text.insert(tk.END, "Search Results:\n\n")
+
+        if results:
+            for result in results:
+                search_text.insert(tk.END, f"ID: {result[0]}, Name: {result[1]}, Birthdate: {result[2]}, Parent ID: {result[3]}\n")
+        else:
+            search_text.insert(tk.END, "No results found for the given name.")
+
+    def delete_family_member(self):
+        delete_window = tk.Toplevel(self.root)
+        delete_window.title("Delete Family Member")
+
+        delete_label = ttk.Label(delete_window, text="Enter the ID of the family member to delete:")
+        delete_label.pack(pady=10)
+
+        delete_entry = ttk.Entry(delete_window)
+        delete_entry.pack(pady=10)
+
+        delete_button = ttk.Button(delete_window, text="Delete", command=lambda: self.perform_delete(int(delete_entry.get())))
+        delete_button.pack(pady=10)
+
+    def perform_delete(self, member_id):
+        self.cursor.execute('DELETE FROM family_members WHERE id = ?', (member_id,))
+        self.conn.commit()
+        print("Family member deleted successfully!")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FamilyTreeApp(root)
+    root.mainloop()
+
+# Close the database connection when the GUI is closed
+app.conn.close()
